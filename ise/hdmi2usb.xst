@@ -1,5 +1,5 @@
 run
--ifn ../ise/hdmi2usb.prj
+-ifn ise/hdmi2usb.prj
 -ofn hdmi2usb
 -ofmt NGC
 -p xc6slx45-3-csg324
@@ -13,7 +13,7 @@ run
 -rtlview Yes
 -glob_opt AllClockNets
 -read_cores YES
--sd {"../ipcore_dir"  }
+-sd {"ipcore_dir"  }
 -write_timing_constraints NO
 -cross_clock_analysis NO
 -hierarchy_separator /

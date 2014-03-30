@@ -1,98 +1,54 @@
-INTSTYLE = ise
-# INTSTYLE = silent
+# HDMI2USB Xilinx FPGA bitstream generation
+# 2014 Joel Stanley <joel@jms.id.au>
 
-BUILD_DIR = build # build directiry for temp files
-	
+# Lists the input Verilog and VHDL files, so we can
+# trigger a rebuild when they change
+-include hdl.mk
 
-# Top Level
-all: syn tran map par trce bit
+PART	:= xc6slx45-csg324-3
+PROJECT	:= hdmi2usb
 
+all: $(PROJECT).bit
 
-syn:
-	@echo "========================================================="
-	@echo "                       Synthesizing                      "
-	@echo "========================================================="
-	@mkdir -p $(BUILD_DIR)
-	@cd $(BUILD_DIR); \
-	xst \
-	-intstyle $(INTSTYLE) \
-	-filter "../ise/iseconfig/filter.filter" \
-	-ifn "../ise/hdmi2usb.xst" \
-	-ofn "hdmi2usb.syr"
-	
-tran:
-	@echo "========================================================="
-	@echo "                        Translate                        "
-	@echo "========================================================="	
-	@cd $(BUILD_DIR); \
-	ngdbuild \
-	-filter "../ise/iseconfig/filter.filter" \
-	-intstyle $(INTSTYLE) \
-	-dd _ngo \
-	-sd ../ipcore_dir \
-	-nt timestamp \
-	-uc ../ucf/hdmi2usb.ucf \
-	-p xc6slx45-csg324-3 hdmi2usb.ngc hdmi2usb.ngd  
+ifndef XILINX
+	@echo "Xilinx environment variable is not set. Ensure you have"
+	@echo "installed Xilinx ISE and have sourced settings64.sh from"
+	@echo "the install location."
+endif
 
-map:
-	@echo "========================================================="
-	@echo "                          Map                            "
-	@echo "========================================================="
-	@cd $(BUILD_DIR); \
-	map \
-	-filter "../ise/iseconfig/filter.filter" \
-	-intstyle $(INTSTYLE) \
-	-p xc6slx45-csg324-3 \
-	-w -logic_opt off \
-	-ol high \
-	-xe n \
-	-t 1 \
-	-xt 0 \
-	-register_duplication off \
-	-r 4 \
-	-global_opt off \
-	-mt off -ir off \
-	-pr b -lc off \
-	-power off \
-	-o hdmi2usb_map.ncd hdmi2usb.ngd hdmi2usb.pcf 
+$(PROJECT).ngc: ise/$(PROJECT).xst ise/$(PROJECT).prj $(HDL)
+	xst -intstyle ise -filter ise/iseconfig/filter.filter -ifn $<
 
-par:
-	@echo "========================================================="
-	@echo "                     Place & Route                       "
-	@echo "========================================================="
-	@cd $(BUILD_DIR); \
-	par \
-	-filter "../ise/iseconfig/filter.filter" -w \
-	-intstyle $(INTSTYLE) \
-	-ol high \
-	-xe n \
-	-mt off hdmi2usb_map.ncd hdmi2usb.ncd hdmi2usb.pcf 
+$(PROJECT).ngd: $(PROJECT).ngc ucf/$(PROJECT).ucf
+	ngdbuild -dd _ngo -sd ipcore_dir -nt timestamp -p $(PART) \
+		-uc ucf/$(PROJECT).ucf $< $@
 
-trce:
-	@echo "========================================================="
-	@echo "                        Trace                            "
-	@echo "========================================================="
-	@cd $(BUILD_DIR); \
-	trce \
-	-filter "../ise/iseconfig/filter.filter" \
-	-intstyle $(INTSTYLE) \
-	-v 3 \
-	-s 3 \
-	-n 3 \
-	-fastpaths \
-	-xml hdmi2usb.twx hdmi2usb.ncd \
-	-o hdmi2usb.twr hdmi2usb.pcf 
+# TODO(JS): why is logic_opt off?
+# TODO(JS): I didn't set options that the help text indicated
+# were being set to their defaults. Is this OK?
+# TODO(JS): Enabled multi-threading. Is this OK?
+$(PROJECT)_map.ncd: $(PROJECT).ngd
+	map -p $(PART) -logic_opt off -ol high -xe n -register_duplication off \
+		-mt 2 -pr b -o $@ $< $(PROJECT).pcf
 
-bit:
-	@echo "========================================================="
-	@echo "                        Bitgen                           "
-	@echo "========================================================="
-	@cd $(BUILD_DIR); \
-	bitgen \
-	-filter "../ise/iseconfig/filter.filter" \
-	-intstyle $(INTSTYLE) \
-	-f ../ise/hdmi2usb.ut hdmi2usb.ncd 
+# TODO(JS): Enabled multi-threading. Is this OK?
+$(PROJECT).ncd: $(PROJECT)_map.ncd $(PROJECT).pcf
+	# par foo_map.ncd foo.ncd foo.pcf
+	par -ol high -mt 4 $< $@ $(PROJECT).pcf
+
+$(PROJECT).twr: $(PROJECT).ncd $(PROJECT).pcf
+	# tcre foo.ncd -o foo.twr foo.pcf
+	trce -v 3 -s 3 -n 3 -fastpaths $< -o $@ $(PROJECT).pcf
+
+$(PROJECT).bit: $(PROJECT).ncd
+	bitgen -f ise/hdmi2usb.ut $<
+
+# TODO(JS): Finish and test this
+program: $(PROJECT).bit
+	impact -b $< -port auto -mode bscan -autoassign
 
 clean:
-	rm -R $(BUILD_DIR)
+	$(RM) *.bgn *.ngc *.svf *.ngd *.bit *.twr *.ncd *.xrpt
+	$(RM) -rf _xmsgs/ xst/
 
+.PHONY: all clean help
