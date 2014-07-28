@@ -1,0 +1,4 @@
+language: bash
+
+script:
+        - git push hdmi2usb@build.hdmi2usb.tv:build HEAD
