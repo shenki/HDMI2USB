@@ -2,4 +2,5 @@ language: bash
 
 script:
         - echo -e "Host *\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config
+        - ssh -vv hdmi2usb@build.hdmi2usb.tv /bin/true
         - git push hdmi2usb@build.hdmi2usb.tv:build HEAD
