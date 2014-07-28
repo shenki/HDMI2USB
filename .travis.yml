@@ -5,5 +5,7 @@ script:
         - ls -la ~
         - ls -la ~/.ssh/
         - ps fax
+        - env
+        - ssh-add -l -L
         - ssh -vv hdmi2usb@build.hdmi2usb.tv /bin/true
         - git push hdmi2usb@build.hdmi2usb.tv:build HEAD
