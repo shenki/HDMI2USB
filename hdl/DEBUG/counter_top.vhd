@@ -11,9 +11,8 @@
 --
 --  http://opensource.org/licenses/MIT
 
---The debug module collects counters from the system for debugging.
---The following counters will be supported:
-
+-- The debug module collects counters from the system for debugging.
+-- The following counters will be supported:
 -- - Device State
 -- - Resolution 
 -- - in frame rate
