@@ -28,93 +28,87 @@
 -- ///
 -- //////////////////////////////////////////////////////////////////////////////
 
-LIBRARY IEEE;
-USE ieee.std_logic_1164.all;
-USE ieee.std_logic_arith.all;		 
-USE ieee.std_logic_unsigned.all;
+library IEEE;
+use ieee.std_logic_1164.all;
+use ieee.std_logic_arith.all;
+use ieee.std_logic_unsigned.all;
 
 entity cdc_out is
-  port 
-  (
-	-- in signals
-	fdata		: in std_logic_vector(7 downto 0);
-	flag_empty 	: in std_logic;
-	faddr		: in std_logic_vector(1 downto 0);
-	cdcout		: in std_logic_vector(1 downto 0);
-	
-	-- out signals
-	slrd		: out std_logic;
-	cmd			: out std_logic_vector(7 downto 0);
-	cmd_en 		: out std_logic;	
-	cdc_out_free: out std_logic;	
-  
-  	-- ifclk,rst
-	rst 		: in std_logic;	
-	ifclk 		: in std_logic
-  );
+  port (
+    -- in signals
+    fdata      : in std_logic_vector(7 downto 0);
+    flag_empty : in std_logic;
+    faddr      : in std_logic_vector(1 downto 0);
+    cdcout     : in std_logic_vector(1 downto 0);
+
+    -- out signals
+    slrd         : out std_logic;
+    cmd          : out std_logic_vector(7 downto 0);
+    cmd_en       : out std_logic;
+    cdc_out_free : out std_logic;
+
+    -- ifclk,rst
+    rst   : in std_logic;
+    ifclk : in std_logic
+    );
 end entity cdc_out;
 
 
 architecture rtl of cdc_out is
 
-type states is (s_wait_for_cdc,s_reset,s_read_data,s_free_cdc,s_skip);
-signal ps : states;
+  type states is (s_wait_for_cdc, s_reset, s_read_data, s_free_cdc, s_skip);
+  signal ps : states;
 
-begin -- architecture
+begin  -- architecture
 
-process(ifclk,rst)
-begin
-if rst = '1' then
-	slrd		<= '1';
-	cmd			<= (others => '0');
-	cmd_en 		<= '0';
-	cdc_out_free <= '1';
-	ps 		<= s_reset;
+  process(ifclk, rst)
+  begin
+    if rst = '1' then
+      slrd         <= '1';
+      cmd          <= (others => '0');
+      cmd_en       <= '0';
+      cdc_out_free <= '1';
+      ps           <= s_reset;
 
-elsif falling_edge(ifclk) then
+    elsif falling_edge(ifclk) then
+      slrd   <= '1';
+      cmd    <= (others => '0');
+      cmd_en <= '0';
 
-	slrd		<= '1';
-	cmd			<= (others => '0');
-	cmd_en 		<= '0';
-	
+      case ps is
+        when s_reset =>
+          slrd         <= '1';
+          cmd          <= (others => '0');
+          cmd_en       <= '0';
+          cdc_out_free <= '1';
+          ps           <= s_wait_for_cdc;
 
-	case ps is
-	when s_reset =>
-		slrd		<= '1';
-		cmd			<= (others => '0');
-		cmd_en 		<= '0';
-		cdc_out_free <= '1';
-		ps 		<= s_wait_for_cdc;
+        when s_wait_for_cdc =>
+          if faddr = cdcout then
+            ps           <= s_read_data;
+            cdc_out_free <= '0';
+          end if;
 
-	when s_wait_for_cdc =>
-		if  faddr = cdcout then
-			ps <= s_read_data;			
-			cdc_out_free <= '0';
-		end if;
-		
-	when s_read_data =>
-		ps <= s_free_cdc;
-		if flag_empty = '1' then -- some data in fifo
-			slrd <= '0';
-			cmd_en <= '1';
-			cmd	<= fdata;			
-		end if;	
+        when s_read_data =>
+          ps <= s_free_cdc;
+          if flag_empty = '1' then      -- some data in fifo
+            slrd   <= '0';
+            cmd_en <= '1';
+            cmd    <= fdata;
+          end if;
 
-	when s_free_cdc =>
-		ps 		<= s_skip;
-		cdc_out_free	<= '1';	
+        when s_free_cdc =>
+          ps           <= s_skip;
+          cdc_out_free <= '1';
 
-	when s_skip =>		
-		ps 		<= s_wait_for_cdc;	
-	
-	when others =>
-		ps <= s_reset;
-	end case;	
+        when s_skip =>
+          ps <= s_wait_for_cdc;
 
+        when others =>
+          ps <= s_reset;
+      end case;
 
-end if;
-end process;
+    end if;
+  end process;
 
 end architecture;
-
-
